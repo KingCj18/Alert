@@ -34,8 +34,9 @@ async function enableNotifications() {
     await navigator.serviceWorker.ready;
 
     const keyResponse = await fetch('/api/vapid-public-key');
-    const { publicKey } = await keyResponse.json();
-    if (!publicKey) throw new Error('Server VAPID key is not configured.');
+    let { publicKey } = await keyResponse.json();
+if (publicKey) publicKey = publicKey.trim();
+if (!publicKey) throw new Error('Server VAPID key is not configured.');
 
     const existing = await registration.pushManager.getSubscription();
     const subscription = existing || await registration.pushManager.subscribe({
