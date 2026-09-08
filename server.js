@@ -184,7 +184,7 @@ async function poll() {
       lastAlertKey = key;
       console.log(`🎵 Twenty One Pilots detected: ${parsed.title}`);
       await sendPush({
-        title: 'Twenty One Pilots is on 107.3 ALTCLE 🎵',
+        title: 'Twenty One Pilots is on Emma Radio 🎵',
         body: parsed.title ? `${parsed.title} — tune in now!` : 'Tune in now!',
         url: '/?top=playing',
         tag: 'top-playing'
