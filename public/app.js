@@ -70,10 +70,19 @@ async function testNotification() {
 }
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+  // Remove any whitespace or line breaks
+  base64String = base64String.replace(/\s/g, '');
+  // Add padding if needed
+  while (base64String.length % 4 !== 0) {
+    base64String += '=';
+  }
+  // Convert to standard base64
+  const raw = atob(base64String.replace(/-/g, '+').replace(/_/g, '/'));
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    arr[i] = raw.charCodeAt(i);
+  }
+  return arr;
 }
 
 $('notifyBtn').addEventListener('click', enableNotifications);
