@@ -48,35 +48,28 @@ function pick(obj, keys) {
 }
 
 function parseMetadata(data) {
-  // Futuri feeds commonly expose artist/title directly. These fallbacks
-  // also handle small variations in feed structure.
-  const candidates = [];
+  // Handle ID3/Shoutcast format (TPE1 = artist, TIT2 = title)
   if (data && typeof data === 'object') {
-    candidates.push(data);
+    // Direct ID3 tags
+    const artist = data.TPE1 || data.artist || data.artistName || data.performer || '';
+    const title = data.TIT2 || data.title || data.song || data.songTitle || data.track || '';
+    
+    if (artist && title) {
+      return { artist: String(artist).trim(), title: String(title).trim() };
+    }
+    
+    // Fallback: check for nested objects
     for (const k of ['nowplaying', 'nowPlaying', 'current', 'song', 'track']) {
-      if (data[k] && typeof data[k] === 'object') candidates.push(data[k]);
+      if (data[k] && typeof data[k] === 'object') {
+        const nested = data[k];
+        const a = nested.TPE1 || nested.artist || nested.artistName || '';
+        const t = nested.TIT2 || nested.title || nested.song || '';
+        if (a && t) return { artist: String(a).trim(), title: String(t).trim() };
+      }
     }
   }
-
-  let artist = '';
-  let title = '';
-
-  for (const c of candidates) {
-    artist ||= pick(c, ['artist', 'artistName', 'performer']);
-    title ||= pick(c, ['title', 'song', 'songTitle', 'track', 'trackTitle']);
-  }
-
-  // Some feeds put "Artist - Title" in a single field.
-  if ((!artist || !title) && data && typeof data === 'object') {
-    const combined = pick(data, ['now_playing', 'nowPlaying', 'name']);
-    if (combined && combined.includes(' - ')) {
-      const [a, ...rest] = combined.split(' - ');
-      artist ||= a.trim();
-      title ||= rest.join(' - ').trim();
-    }
-  }
-
-  return { artist, title };
+  
+  return { artist: '', title: '' };
 }
 
 async function fetchMetadata() {
@@ -85,7 +78,13 @@ async function fetchMetadata() {
     cache: 'no-store'
   });
   if (!response.ok) throw new Error(`Metadata HTTP ${response.status}`);
-  return response.json();
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // If it's not JSON, try to parse ICY format
+    throw new Error('Invalid JSON response from metadata endpoint');
+  }
 }
 
 async function sendPush(payload) {
