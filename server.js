@@ -50,9 +50,19 @@ function pick(obj, keys) {
 function parseMetadata(data) {
   console.log('Raw metadata:', JSON.stringify(data).substring(0, 500));
   
-  // Try direct access
-  const artist = data.TPE1 || data['artist'] || data['TPE1'] || '';
-  const title = data.TIT2 || data['title'] || data['TIT2'] || '';
+  // If it's an array, take the first item
+  if (Array.isArray(data) && data.length > 0) {
+    data = data[0];
+  }
+  
+  // If it's still not an object, return empty
+  if (!data || typeof data !== 'object') {
+    return { artist: '', title: '' };
+  }
+  
+  // Try direct access (ID3 tags)
+  const artist = data.TPE1 || data.artist || data.artistName || data.performer || '';
+  const title = data.TIT2 || data.title || data.song || data.songTitle || data.track || '';
   
   if (artist && title) {
     return { artist: String(artist).trim(), title: String(title).trim() };
