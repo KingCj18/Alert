@@ -240,13 +240,34 @@ app.post('/api/unsubscribe', async (req, res) => {
 });
 
 app.post('/api/test', async (req, res) => {
-  await sendPush({
-    title: 'TOP Alert test 🎵',
-    body: 'Notifications are working!',
-    url: '/?test=1',
-    tag: 'top-test'
-  });
-  res.json({ ok: true });
+  const subscription = req.body.subscription;
+  
+  if (!subscription) {
+    return res.status(400).json({ error: 'Missing subscription' });
+  }
+  
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) {
+    return res.status(500).json({ error: 'VAPID keys not configured' });
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT,
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+
+  try {
+    await webpush.sendNotification(subscription, JSON.stringify({
+      title: 'Emma is watching test 👀',
+      body: 'Notifications are working!',
+      url: '/?test=1',
+      tag: 'top-test'
+    }));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Test notification failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('*', (req, res) => {
