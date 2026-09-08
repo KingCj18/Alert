@@ -151,20 +151,13 @@ async function poll() {
   }
 }
 
-app.get('/api/status', (req, res) => {
-  res.json({
-    station: '107.3 ALTCLE',
-    metadataUrl: METADATA_URL,
-    current: {
-      artist: current.artist,
-      title: current.title,
-      updatedAt: current.updatedAt
-    },
-    monitoring: true,
-    lastPollAt,
-    lastError,
-    subscribers: subscriptions.length
-  });
+app.get('/api/debug-metadata', async (req, res) => {
+  try {
+    const data = await fetchMetadata();
+    res.json({ raw: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/vapid-public-key', (req, res) => {
