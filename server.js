@@ -151,14 +151,7 @@ async function poll() {
   }
 }
 
-app.get('/api/debug-metadata', async (req, res) => {
-  try {
-    const data = await fetchMetadata();
-    res.json({ raw: data });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+
 
 app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
