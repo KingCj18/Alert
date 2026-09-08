@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>TOP Alert — 107.3 ALTCLE</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="badge">107.3 ALTCLE</div>
+    <h1>Twenty One Pilots<br>Alert</h1>
+    <p class="sub">I’ll watch the station for you. When TOP comes on, your phone gets a notification.</p>
+
+    <section class="card now">
+      <div class="label">NOW PLAYING</div>
+      <div id="artist">Loading…</div>
+      <div id="title">Checking the station…</div>
+      <div id="updated" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <div class="status-row">
+        <span class="dot"></span>
+        <strong>Monitor: ON</strong>
+      </div>
+      <p class="muted">The server checks the station about every 10 seconds, even when this page is closed.</p>
+
+      <button id="notifyBtn">Enable iPhone Notifications</button>
+      <button id="testBtn" class="secondary">Send Test Notification</button>
+      <p id="message" class="message"></p>
+    </section>
+
+    <section class="card small">
+      <strong>How it works</strong>
+      <ol>
+        <li>Add this site to your iPhone Home Screen.</li>
+        <li>Open the Home Screen app.</li>
+        <li>Tap Enable Notifications and allow them.</li>
+        <li>When Twenty One Pilots is detected, you get an alert.</li>
+      </ol>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
