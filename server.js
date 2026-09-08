@@ -2,6 +2,7 @@ const express = require('express');
 const webpush = require('web-push');
 const fs = require('fs');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(express.json({ limit: '100kb' }));
@@ -12,7 +13,22 @@ const POLL_MS = Number(process.env.POLL_MS || 10000);
 
 const METADATA_URL = 'https://yp.cdnstream1.com/metadata/10586_96k/current.json';
 const ARTIST_TARGET = 'twenty one pilots';
-const SUB_FILE = path.join(__dirname, 'subscriptions.json');
+
+// Supabase setup
+const supabaseUrl = 'https://blkhvofpdikepknlstnt.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY;
+let supabase;
+
+try {
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('✅ Supabase connected successfully.');
+  } else {
+    console.log('⚠️ Supabase credentials missing. Using memory-only storage.');
+  }
+} catch (err) {
+  console.error('❌ Supabase connection error:', err.message);
+}
 
 let subscriptions = [];
 let current = { artist: '', title: '', raw: null, updatedAt: null };
@@ -20,13 +36,62 @@ let lastAlertKey = '';
 let lastPollAt = null;
 let lastError = null;
 
-if (fs.existsSync(SUB_FILE)) {
-  try { subscriptions = JSON.parse(fs.readFileSync(SUB_FILE, 'utf8')); }
-  catch { subscriptions = []; }
+async function loadSubscriptions() {
+  if (!supabase) {
+    console.log('⚠️ Supabase not available. Subscriptions will not persist across restarts.');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*');
+    
+    if (error) throw error;
+    
+    subscriptions = data.map(row => ({
+      endpoint: row.endpoint,
+      keys: { auth: row.keys_auth, p256dh: row.keys_p256dh }
+    }));
+    console.log(`✅ Loaded ${subscriptions.length} subscriptions from Supabase.`);
+  } catch (err) {
+    console.error('❌ Failed to load subscriptions from Supabase:', err.message);
+  }
 }
 
-function saveSubscriptions() {
-  fs.writeFileSync(SUB_FILE, JSON.stringify(subscriptions, null, 2));
+async function saveSubscription(subscription) {
+  if (!supabase) return;
+
+  try {
+    const { error } = await supabase
+      .from('subscriptions')
+      .insert({
+        endpoint: subscription.endpoint,
+        keys_auth: subscription.keys.auth,
+        keys_p256dh: subscription.keys.p256dh
+      });
+    
+    if (error) throw error;
+    console.log('✅ Subscription saved to Supabase.');
+  } catch (err) {
+    console.error('❌ Failed to save subscription:', err.message);
+  }
+}
+
+async function removeSubscription(endpoint) {
+  if (!supabase) return;
+
+  try {
+    const { error } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('endpoint', endpoint);
+    
+    if (error) throw error;
+    console.log('✅ Subscription removed from Supabase.');
+  } catch (err) {
+    console.error('❌ Failed to remove subscription:', err.message);
+  }
 }
 
 function normalize(value) {
@@ -37,45 +102,20 @@ function normalize(value) {
     .trim();
 }
 
-function pick(obj, keys) {
-  if (!obj || typeof obj !== 'object') return '';
-  for (const key of keys) {
-    if (obj[key] !== undefined && obj[key] !== null && String(obj[key]).trim()) {
-      return String(obj[key]).trim();
-    }
-  }
-  return '';
-}
-
 function parseMetadata(data) {
-  console.log('Raw metadata:', JSON.stringify(data).substring(0, 500));
-  
-  // If it's an array, take the first item
   if (Array.isArray(data) && data.length > 0) {
     data = data[0];
   }
   
-  // If it's still not an object, return empty
   if (!data || typeof data !== 'object') {
     return { artist: '', title: '' };
   }
   
-  // Try direct access (ID3 tags)
   const artist = data.TPE1 || data.artist || data.artistName || data.performer || '';
   const title = data.TIT2 || data.title || data.song || data.songTitle || data.track || '';
   
   if (artist && title) {
     return { artist: String(artist).trim(), title: String(title).trim() };
-  }
-  
-  // Try all keys
-  for (const key of Object.keys(data)) {
-    if (key === 'TPE1' || key === 'artist' || key === 'artistName') {
-      return { artist: String(data[key]).trim(), title: '' };
-    }
-    if (key === 'TIT2' || key === 'title' || key === 'song') {
-      return { artist: '', title: String(data[key]).trim() };
-    }
   }
   
   return { artist: '', title: '' };
@@ -91,14 +131,13 @@ async function fetchMetadata() {
   try {
     return JSON.parse(text);
   } catch {
-    // If it's not JSON, try to parse ICY format
     throw new Error('Invalid JSON response from metadata endpoint');
   }
 }
 
 async function sendPush(payload) {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) {
-    console.log('VAPID keys are not configured; skipping push.');
+    console.log('⚠️ VAPID keys are not configured; skipping push.');
     return;
   }
 
@@ -116,13 +155,12 @@ async function sendPush(payload) {
       await webpush.sendNotification(sub, body);
       remaining.push(sub);
     } catch (err) {
-      // 404/410 means the browser subscription expired or was removed.
       if (err.statusCode !== 404 && err.statusCode !== 410) remaining.push(sub);
+      else await removeSubscription(sub.endpoint);
     }
   }
 
   subscriptions = remaining;
-  saveSubscriptions();
 }
 
 async function poll() {
@@ -144,8 +182,7 @@ async function poll() {
 
     if (artistMatch && key && key !== lastAlertKey) {
       lastAlertKey = key;
-      console.log(`Twenty One Pilots detected: ${parsed.title}`);
-
+      console.log(`🎵 Twenty One Pilots detected: ${parsed.title}`);
       await sendPush({
         title: 'Twenty One Pilots is on 107.3 ALTCLE 🎵',
         body: parsed.title ? `${parsed.title} — tune in now!` : 'Tune in now!',
@@ -157,10 +194,11 @@ async function poll() {
     console.log(`[${new Date().toLocaleTimeString()}] ${parsed.artist} — ${parsed.title}`);
   } catch (err) {
     lastError = String(err.message || err);
-    console.error('Poll error:', lastError);
+    console.error('❌ Poll error:', lastError);
   }
 }
 
+// Routes
 app.get('/api/status', (req, res) => {
   res.json({
     station: '107.3 ALTCLE',
@@ -177,28 +215,27 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-
 app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
 });
 
-app.post('/api/subscribe', (req, res) => {
+app.post('/api/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Invalid subscription' });
 
   const exists = subscriptions.some(x => x.endpoint === sub.endpoint);
   if (!exists) {
     subscriptions.push(sub);
-    saveSubscriptions();
+    await saveSubscription(sub);
   }
 
   res.json({ ok: true, subscribers: subscriptions.length });
 });
 
-app.post('/api/unsubscribe', (req, res) => {
+app.post('/api/unsubscribe', async (req, res) => {
   const endpoint = req.body?.endpoint;
   subscriptions = subscriptions.filter(x => x.endpoint !== endpoint);
-  saveSubscriptions();
+  await removeSubscription(endpoint);
   res.json({ ok: true });
 });
 
@@ -216,8 +253,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`TOP Alert running on port ${PORT}`);
+// Start server
+app.listen(PORT, async () => {
+  console.log(`🚀 TOP Alert running on port ${PORT}`);
+  await loadSubscriptions();
   poll();
   setInterval(poll, POLL_MS);
 });
