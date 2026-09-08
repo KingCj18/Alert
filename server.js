@@ -112,7 +112,7 @@ function parseMetadata(data) {
   }
   
   const artist = data.TPE1 || data.artist || data.artistName || data.performer || '';
-  const title = data.TIT2 || data.title || data.song || data.songTitle || data.track || '';
+  const title = data.TIT2 || data.TTI2 || data.title || data.song || data.songTitle || data.track || '';
   
   if (artist && title) {
     return { artist: String(artist).trim(), title: String(title).trim() };
