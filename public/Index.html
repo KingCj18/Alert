@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>107.3 ALTCLE Alert</title>
+  <link rel="manifest" href="/manifest.json" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; text-align: center; }
+    button { background: #007bff; color: white; border: none; padding: 1rem 2rem; font-size: 1.2rem; border-radius: 8px; cursor: pointer; }
+    #status { margin-top: 2rem; padding: 1rem; background: #f0f0f0; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>🎵 107.3 ALTCLE</h1>
+  <p>Waiting for Twenty One Pilots...</p>
+  <div id="status">Loading...</div>
+  <button id="subscribeBtn">Enable Notifications</button>
+  <script>
+    const statusDiv = document.getElementById('status');
+    const subscribeBtn = document.getElementById('subscribeBtn');
+
+    async function updateStatus() {
+      try {
+        const res = await fetch('/api/current');
+        const data = await res.json();
+        statusDiv.innerHTML = `Now Playing: <strong>${data.artist} – ${data.title}</strong>`;
+      } catch {
+        statusDiv.textContent = 'Waiting for update...';
+      }
+    }
+    updateStatus();
+    setInterval(updateStatus, 10000);
+
+    subscribeBtn.addEventListener('click', async () => {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+        alert('Please use Safari on iPhone, add to Home Screen, then try again.');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Notification permission denied.');
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'BK7NchDVeD_gULGdQRy1ozf7_hlN00VKIz08x9QkQEdnFqcXp1Tp02XZVhFA1c_QoMSb1ZJfL-XF3rj8wIl48yY'
+      });
+      await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+      alert('Notifications enabled!');
+    });
+  </script>
+</body>
+</html>
