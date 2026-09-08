@@ -34,7 +34,7 @@ async function enableNotifications() {
     await navigator.serviceWorker.ready;
 
     // Skip the fetch – hardcode the key directly
-    const publicKey = 'uzXIQ1Xg_4FCxnUEctaM3-_4ZTdNFSiM9PMfUJEBHZxanF6dU6dNl2VYRQNXP0KDEm9WSXy_lxd64_MCJePMm';
+    const publicKey = 'BHuwp-gnJHOf1GiamwMrnCzKA5iglhGF4uXd5sm2FrNVtqavPf9UNkvgtB7O_216DtQjzRprsM0MOb5mngRl_5A';
     if (!publicKey) throw new Error('Server VAPID key is not configured.');
 
     const existing = await registration.pushManager.getSubscription();
