@@ -165,12 +165,28 @@ async function sendPush(payload) {
 
 async function poll() {
   try {
-    const data = await fetchMetadata();
-    const parsed = parseMetadata(data);
+    // Safety: If fetchMetadata fails, don't crash the interval
+    let data;
+    try {
+      data = await fetchMetadata();
+    } catch (fetchErr) {
+      console.error('⚠️ Fetch error (continuing):', fetchErr.message);
+      lastError = fetchErr.message;
+      return; // Exit poll() gracefully, interval keeps running
+    }
+
+    let parsed;
+    try {
+      parsed = parseMetadata(data);
+    } catch (parseErr) {
+      console.error('⚠️ Parse error (continuing):', parseErr.message);
+      lastError = parseErr.message;
+      return; // Exit poll() gracefully, interval keeps running
+    }
 
     current = {
-      artist: parsed.artist,
-      title: parsed.title,
+      artist: parsed.artist || '',
+      title: parsed.title || '',
       raw: data,
       updatedAt: new Date().toISOString()
     };
@@ -183,18 +199,23 @@ async function poll() {
     if (artistMatch && key && key !== lastAlertKey) {
       lastAlertKey = key;
       console.log(`🎵 Twenty One Pilots detected: ${parsed.title}`);
-      await sendPush({
-        title: 'Twenty One Pilots is on Emma Radio 🎵',
-        body: parsed.title ? `${parsed.title} — tune in now!` : 'Tune in now!',
-        url: '/?top=playing',
-        tag: 'top-playing'
-      });
+      try {
+        await sendPush({
+          title: 'Twenty One Pilots is on Emma Radio 🎵',
+          body: parsed.title ? `${parsed.title} — tune in now!` : 'Tune in now!',
+          url: '/?top=playing',
+          tag: 'top-playing'
+        });
+      } catch (pushErr) {
+        console.error('Push error:', pushErr.message);
+      }
     }
 
     console.log(`[${new Date().toLocaleTimeString()}] ${parsed.artist} — ${parsed.title}`);
   } catch (err) {
     lastError = String(err.message || err);
-    console.error('❌ Poll error:', lastError);
+    console.error('❌ Poll error (wrapped):', lastError);
+    // The interval continues — we don't crash here!
   }
 }
 
@@ -273,6 +294,22 @@ app.post('/api/test', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Watchdog: If poll() hasn't run in 60 seconds, force a restart
+let lastPollSuccess = Date.now();
+const originalPoll = poll;
+poll = async function() {
+  lastPollSuccess = Date.now();
+  await originalPoll();
+};
+
+setInterval(() => {
+  const secondsSinceLastPoll = (Date.now() - lastPollSuccess) / 1000;
+  if (secondsSinceLastPoll > 60) {
+    console.error(`⚠️ No poll for ${secondsSinceLastPoll}s. Restarting process...`);
+    process.exit(1); // Render will restart the server
+  }
+}, 30000);
 
 // Start server
 app.listen(PORT, async () => {
