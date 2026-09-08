@@ -1,0 +1,9 @@
+{
+  "name": "TOP Alert — 107.3 ALTCLE",
+  "short_name": "TOP Alert",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "description": "Alerts you when Twenty One Pilots is playing on 107.3 ALTCLE."
+}
