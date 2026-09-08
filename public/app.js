@@ -59,13 +59,25 @@ async function enableNotifications() {
 async function testNotification() {
   const msg = $('message');
   try {
-    const r = await fetch('/api/test', { method: 'POST' });
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    
+    if (!subscription) {
+      msg.textContent = 'Please enable notifications first.';
+      return;
+    }
+    
+    const r = await fetch('/api/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription })
+    });
     const data = await r.json();
     msg.textContent = data.ok
       ? 'Test sent. Check your notification banner.'
-      : 'Test failed.';
-  } catch {
-    msg.textContent = 'Test failed.';
+      : 'Test failed: ' + (data.error || '');
+  } catch (e) {
+    msg.textContent = 'Test failed: ' + e.message;
   }
 }
 
