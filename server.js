@@ -48,24 +48,23 @@ function pick(obj, keys) {
 }
 
 function parseMetadata(data) {
-  // Handle ID3/Shoutcast format (TPE1 = artist, TIT2 = title)
-  if (data && typeof data === 'object') {
-    // Direct ID3 tags
-    const artist = data.TPE1 || data.artist || data.artistName || data.performer || '';
-    const title = data.TIT2 || data.title || data.song || data.songTitle || data.track || '';
-    
-    if (artist && title) {
-      return { artist: String(artist).trim(), title: String(title).trim() };
+  console.log('Raw metadata:', JSON.stringify(data).substring(0, 500));
+  
+  // Try direct access
+  const artist = data.TPE1 || data['artist'] || data['TPE1'] || '';
+  const title = data.TIT2 || data['title'] || data['TIT2'] || '';
+  
+  if (artist && title) {
+    return { artist: String(artist).trim(), title: String(title).trim() };
+  }
+  
+  // Try all keys
+  for (const key of Object.keys(data)) {
+    if (key === 'TPE1' || key === 'artist' || key === 'artistName') {
+      return { artist: String(data[key]).trim(), title: '' };
     }
-    
-    // Fallback: check for nested objects
-    for (const k of ['nowplaying', 'nowPlaying', 'current', 'song', 'track']) {
-      if (data[k] && typeof data[k] === 'object') {
-        const nested = data[k];
-        const a = nested.TPE1 || nested.artist || nested.artistName || '';
-        const t = nested.TIT2 || nested.title || nested.song || '';
-        if (a && t) return { artist: String(a).trim(), title: String(t).trim() };
-      }
+    if (key === 'TIT2' || key === 'title' || key === 'song') {
+      return { artist: '', title: String(data[key]).trim() };
     }
   }
   
